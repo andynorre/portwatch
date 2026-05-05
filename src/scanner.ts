@@ -1,92 +1,82 @@
 import { execSync } from 'child_process';
 
-export interface PortBinding {
+export interface PortInfo {
   port: number;
-  pid: number;
-  process: string;
   protocol: 'tcp' | 'udp';
-  address: string;
+  pid: number | null;
+  process: string | null;
+  state: string;
 }
 
-function parseLinuxOutput(output: string): PortBinding[] {
-  const bindings: PortBinding[] = [];
-  const lines = output.trim().split('\n').slice(1);
+export function parseLinuxOutput(raw: string): PortInfo[] {
+  const lines = raw.trim().split('\n').slice(1);
+  const results: PortInfo[] = [];
 
   for (const line of lines) {
     const parts = line.trim().split(/\s+/);
     if (parts.length < 7) continue;
-
     const proto = parts[0] as 'tcp' | 'udp';
-    const localAddress = parts[3];
+    const localAddr = parts[3];
+    const state = parts[5] ?? 'UNKNOWN';
     const pidProcess = parts[6];
 
-    const addrMatch = localAddress.match(/^(.+):(\d+)$/);
-    if (!addrMatch) continue;
+    const portMatch = localAddr.match(/:([\d]+)$/);
+    if (!portMatch) continue;
+    const port = parseInt(portMatch[1], 10);
 
-    const address = addrMatch[1];
-    const port = parseInt(addrMatch[2], 10);
+    let pid: number | null = null;
+    let process: string | null = null;
+    const pidMatch = pidProcess?.match(/(\d+)\/(.+)/);
+    if (pidMatch) {
+      pid = parseInt(pidMatch[1], 10);
+      process = pidMatch[2];
+    }
 
-    const pidMatch = pidProcess.match(/(\d+)\/(.+)/);
-    if (!pidMatch) continue;
-
-    bindings.push({
-      port,
-      pid: parseInt(pidMatch[1], 10),
-      process: pidMatch[2],
-      protocol: proto,
-      address,
-    });
+    results.push({ port, protocol: proto, pid, process, state });
   }
 
-  return bindings;
+  return results;
 }
 
-function parseMacOutput(output: string): PortBinding[] {
-  const bindings: PortBinding[] = [];
-  const lines = output.trim().split('\n');
+export function parseMacOutput(raw: string): PortInfo[] {
+  const lines = raw.trim().split('\n');
+  const results: PortInfo[] = [];
 
   for (const line of lines) {
-    const match = line.match(
-      /^(tcp|udp)\s+\S+\s+\S+\s+(\S+)\s+\S+\s+LISTEN\s+(\d+)\/(\S+)/i
-    );
-    if (!match) continue;
+    const parts = line.trim().split(/\s+/);
+    if (parts.length < 9) continue;
+    const proto = parts[0].startsWith('tcp') ? 'tcp' : 'udp';
+    const localAddr = parts[3];
+    const state = parts[5] ?? 'UNKNOWN';
 
-    const proto = match[1].toLowerCase() as 'tcp' | 'udp';
-    const localAddress = match[2];
-    const pid = parseInt(match[3], 10);
-    const process = match[4];
+    const portMatch = localAddr.match(/\.([\d]+)$/);
+    if (!portMatch) continue;
+    const port = parseInt(portMatch[1], 10);
 
-    const addrMatch = localAddress.match(/^(.+)\.(\d+)$/);
-    if (!addrMatch) continue;
+    const pidStr = parts[8];
+    const pid = pidStr && /^\d+$/.test(pidStr) ? parseInt(pidStr, 10) : null;
+    const process = parts[0] ?? null;
 
-    bindings.push({
-      port: parseInt(addrMatch[2], 10),
-      pid,
-      process,
-      protocol: proto,
-      address: addrMatch[1],
-    });
+    results.push({ port, protocol: proto, pid, process, state });
   }
 
-  return bindings;
+  return results;
 }
 
-export function scanPorts(): PortBinding[] {
+export function scanPorts(): PortInfo[] {
   const platform = process.platform;
-
   try {
     if (platform === 'linux') {
-      const output = execSync('ss -tlnup 2>/dev/null || netstat -tlnup 2>/dev/null', {
-        encoding: 'utf8',
-      });
-      return parseLinuxOutput(output);
+      const raw = execSync('ss -tulnp', { encoding: 'utf-8' });
+      return parseLinuxOutput(raw);
     } else if (platform === 'darwin') {
-      const output = execSync('netstat -anvp tcp 2>/dev/null', { encoding: 'utf8' });
-      return parseMacOutput(output);
+      const raw = execSync('netstat -anvp tcp', { encoding: 'utf-8' });
+      return parseMacOutput(raw);
     } else {
       throw new Error(`Unsupported platform: ${platform}`);
     }
   } catch (err) {
-    throw new Error(`Failed to scan ports: ${(err as Error).message}`);
+    console.error('Failed to scan ports:', err);
+    return [];
   }
 }
