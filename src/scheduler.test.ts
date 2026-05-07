@@ -34,6 +34,12 @@ describe('startScheduler', () => {
     );
   });
 
+  it('throws for negative intervalMs', () => {
+    expect(() => startScheduler(jest.fn(), { intervalMs: -100 })).toThrow(
+      'intervalMs must be a positive number'
+    );
+  });
+
   it('invokes callback on each interval tick', () => {
     const cb = jest.fn().mockResolvedValue(undefined);
     startScheduler(cb, { intervalMs: 500 });
@@ -61,6 +67,14 @@ describe('startScheduler', () => {
     jest.advanceTimersByTime(1000);
     expect(getSchedulerState().runCount).toBe(2);
   });
+
+  it('resets runCount to 0 after resetScheduler', () => {
+    const cb = jest.fn().mockResolvedValue(undefined);
+    startScheduler(cb, { intervalMs: 500 });
+    jest.advanceTimersByTime(1000);
+    resetScheduler();
+    expect(getSchedulerState().runCount).toBe(0);
+  });
 });
 
 describe('stopScheduler', () => {
@@ -77,5 +91,9 @@ describe('stopScheduler', () => {
     stopScheduler();
     jest.advanceTimersByTime(1000);
     expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw when called while not running', () => {
+    expect(() => stopScheduler()).not.toThrow();
   });
 });
