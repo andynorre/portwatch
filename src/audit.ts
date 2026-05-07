@@ -35,15 +35,31 @@ export function saveAuditLog(
   log: AuditLog,
   filePath: string = DEFAULT_AUDIT_PATH
 ): void {
-  fs.writeFileSync(filePath, JSON.stringify(log, null, 2), 'utf-8');
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(log, null, 2), 'utf-8');
+  } catch (err) {
+    throw new Error(
+      `Failed to save audit log to "${filePath}": ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
 }
 
 export function loadAuditLog(filePath: string = DEFAULT_AUDIT_PATH): AuditLog {
   if (!fs.existsSync(filePath)) {
     return createAuditLog();
   }
-  const raw = fs.readFileSync(filePath, 'utf-8');
-  return JSON.parse(raw) as AuditLog;
+  try {
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    return JSON.parse(raw) as AuditLog;
+  } catch (err) {
+    throw new Error(
+      `Failed to load audit log from "${filePath}": ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
 }
 
 export function getEntriesBySeverity(
