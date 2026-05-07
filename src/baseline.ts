@@ -23,7 +23,11 @@ export function loadBaseline(filePath: string = DEFAULT_BASELINE_PATH): Baseline
   }
   try {
     const raw = fs.readFileSync(filePath, 'utf-8');
-    return JSON.parse(raw) as Baseline;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.ports) || typeof parsed.createdAt !== 'string') {
+      return null;
+    }
+    return parsed as Baseline;
   } catch {
     return null;
   }
