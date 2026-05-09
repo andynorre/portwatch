@@ -1,41 +1,48 @@
 import { SchedulerConfig } from './scheduler.types';
-import { loadConfig } from './config';
 
-const DEFAULT_INTERVAL_MS = 30_000;
-const MIN_INTERVAL_MS = 1_000;
-const MAX_INTERVAL_MS = 3_600_000;
-
-export function buildSchedulerConfig(configPath?: string): SchedulerConfig {
-  let intervalMs = DEFAULT_INTERVAL_MS;
-  let immediate = false;
-
-  try {
-    const cfg = loadConfig(configPath);
-    if (typeof cfg.intervalSeconds === 'number') {
-      intervalMs = cfg.intervalSeconds * 1000;
-    }
-    if (typeof cfg.immediate === 'boolean') {
-      immediate = cfg.immediate;
-    }
-  } catch {
-    // fall back to defaults if config is unavailable
-  }
-
-  if (intervalMs < MIN_INTERVAL_MS) {
-    console.warn(
-      `[scheduler] intervalMs ${intervalMs} is below minimum; using ${MIN_INTERVAL_MS}ms`
-    );
-    intervalMs = MIN_INTERVAL_MS;
-  }
-
-  if (intervalMs > MAX_INTERVAL_MS) {
-    console.warn(
-      `[scheduler] intervalMs ${intervalMs} exceeds maximum; using ${MAX_INTERVAL_MS}ms`
-    );
-    intervalMs = MAX_INTERVAL_MS;
-  }
-
-  return { intervalMs, immediate };
+export interface BuildSchedulerConfigOptions {
+  intervalMs?: number;
+  maxMissedTicks?: number;
+  jitterMs?: number;
+  enableTrend?: boolean;
+  trendWindowMs?: number;
+  trendMaxPoints?: number;
 }
 
-export { DEFAULT_INTERVAL_MS, MIN_INTERVAL_MS, MAX_INTERVAL_MS };
+const DEFAULTS: Required<BuildSchedulerConfigOptions> = {
+  intervalMs: 30_000,
+  maxMissedTicks: 3,
+  jitterMs: 0,
+  enableTrend: true,
+  trendWindowMs: 5 * 60 * 1000,
+  trendMaxPoints: 60,
+};
+
+export function buildSchedulerConfig(
+  options: BuildSchedulerConfigOptions = {}
+): SchedulerConfig & {
+  enableTrend: boolean;
+  trendWindowMs: number;
+  trendMaxPoints: number;
+} {
+  const merged = { ...DEFAULTS, ...options };
+
+  if (merged.intervalMs < 1000) {
+    throw new Error('intervalMs must be at least 1000ms');
+  }
+  if (merged.maxMissedTicks < 1) {
+    throw new Error('maxMissedTicks must be at least 1');
+  }
+  if (merged.trendMaxPoints < 2) {
+    throw new Error('trendMaxPoints must be at least 2');
+  }
+
+  return {
+    intervalMs: merged.intervalMs,
+    maxMissedTicks: merged.maxMissedTicks,
+    jitterMs: merged.jitterMs,
+    enableTrend: merged.enableTrend,
+    trendWindowMs: merged.trendWindowMs,
+    trendMaxPoints: merged.trendMaxPoints,
+  };
+}
