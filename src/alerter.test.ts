@@ -49,6 +49,20 @@ describe('buildAlerts', () => {
     buildAlerts(diff, { onAlert: (a) => received.push(a) });
     expect(received).toHaveLength(2);
   });
+
+  it('includes process name and pid in the generated alert', () => {
+    const diff: PortDiff = { added: [makeEntry(8080, 'tcp', 'nginx', 5678)], removed: [] };
+    const alerts = buildAlerts(diff);
+    expect(alerts[0].process).toBe('nginx');
+    expect(alerts[0].pid).toBe(5678);
+  });
+
+  it('handles udp protocol entries correctly', () => {
+    const diff: PortDiff = { added: [makeEntry(53, 'udp', 'dnsmasq', 101)], removed: [] };
+    const alerts = buildAlerts(diff);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].port).toBe(53);
+  });
 });
 
 describe('formatAlert', () => {
@@ -65,5 +79,19 @@ describe('formatAlert', () => {
     expect(result).toContain('2024-01-15T10:00:00.000Z');
     expect(result).toContain('CRITICAL');
     expect(result).toContain('22/tcp');
+  });
+
+  it('formats a warning alert with correct severity label', () => {
+    const alert: Alert = {
+      severity: 'warning',
+      message: 'New port binding detected: 8080/tcp (node)',
+      port: 8080,
+      pid: 1234,
+      process: 'node',
+      timestamp: new Date('2024-01-15T12:00:00.000Z'),
+    };
+    const result = formatAlert(alert);
+    expect(result).toContain('WARNING');
+    expect(result).toContain('8080/tcp');
   });
 });
