@@ -69,3 +69,22 @@ export function getThrottleStore(): ThrottleStore {
 export function resetThrottleStore(): void {
   store = {};
 }
+
+/**
+ * Removes all entries from the throttle store whose windows have already
+ * expired. Call this periodically (e.g. at the start of each scan cycle)
+ * to prevent the store from growing unbounded over long daemon uptime.
+ */
+export function pruneThrottleStore(
+  config: ThrottleConfig = DEFAULT_CONFIG,
+  now: number = Date.now()
+): number {
+  let pruned = 0;
+  for (const key of Object.keys(store)) {
+    if (now - store[key].lastAlertedAt > config.windowMs) {
+      delete store[key];
+      pruned++;
+    }
+  }
+  return pruned;
+}
