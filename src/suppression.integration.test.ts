@@ -45,4 +45,12 @@ describe('suppression integration', () => {
     const tmpEntry: PortEntry = { port: 9999, protocol: 'tcp', process: 'tmp', pid: 1, state: 'LISTEN' };
     expect(isSuppressed(purged, tmpEntry)).toBe(false);
   });
+
+  it('non-expired rules are retained after purge', () => {
+    let store = loadSuppressionStore(TMP_FILE);
+    store = addRule(store, { port: 7777, reason: 'future', expiresAt: Date.now() + 60_000 });
+    const purged = purgeExpired(store);
+    const futureEntry: PortEntry = { port: 7777, protocol: 'tcp', process: 'future', pid: 2, state: 'LISTEN' };
+    expect(isSuppressed(purged, futureEntry)).toBe(true);
+  });
 });
