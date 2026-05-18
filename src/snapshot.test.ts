@@ -36,6 +36,12 @@ describe('createSnapshot', () => {
     ]);
     expect(a.checksum).not.toBe(b.checksum);
   });
+
+  it('should produce a consistent checksum for an empty port list', () => {
+    const a = createSnapshot([]);
+    const b = createSnapshot([]);
+    expect(a.checksum).toBe(b.checksum);
+  });
 });
 
 describe('saveSnapshot / loadSnapshot', () => {
@@ -56,6 +62,14 @@ describe('saveSnapshot / loadSnapshot', () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.checksum).toBe(snap.checksum);
     expect(loaded!.ports).toEqual(snap.ports);
+  });
+
+  it('should preserve the timestamp after save and load', () => {
+    const snap = createSnapshot(mockPorts);
+    saveSnapshot(snap, tmpFile);
+    const loaded = loadSnapshot(tmpFile);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.timestamp).toBe(snap.timestamp);
   });
 
   it('should return null when file does not exist', () => {
